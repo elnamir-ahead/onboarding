@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+server/node_modules
+server/dist
+bot/node_modules
+bot/dist
+*.log
+.cursor
+supabase

@@ -1,0 +1,53 @@
+# Production-like local test — mirrors the ECS sidecar deployment
+# Run: docker-compose -f docker-compose.prod.yml up --build
+# Then open http://localhost
+version: "3.9"
+
+services:
+  # Both containers share the same network namespace (like ECS sidecar).
+  # Nginx proxies /api → localhost:3001 (backend on the same host).
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    expose:
+      - "3001"          # internal only, not published to host
+    env_file:
+      - ./server/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    network_mode: "service:frontend"   # share network with frontend
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    expose:
+      - "3978"          # internal only — nginx proxies /bot/ inbound
+    env_file:
+      - ./bot/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3978
+      BACKEND_URL: http://localhost:3001   # same network namespace via sidecar
+    network_mode: "service:frontend"
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/index.html"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

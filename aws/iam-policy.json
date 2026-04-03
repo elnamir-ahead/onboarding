@@ -1,0 +1,62 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecretsManagerApp",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:740315635748:secret:openai_api_key-N4gRLQ",
+        "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-jwt-secret*",
+        "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-bot-secret*",
+        "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-id*",
+        "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-password*"
+      ]
+    },
+    {
+      "Sid": "DynamoDBOnboardingTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:CreateTable",
+        "dynamodb:ListTables"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:740315635748:table/ahead-onboarding-*"
+      ]
+    },
+    {
+      "Sid": "ECRPullImages",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:BatchCheckLayerAvailability"
+      ],
+      "Resource": "arn:aws:ecr:us-east-1:740315635748:repository/ahead-onboarding-*"
+    },
+    {
+      "Sid": "ECRAuthToken",
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:CreateLogGroup"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:740315635748:log-group:/ecs/ahead-onboarding:*"
+    }
+  ]
+}

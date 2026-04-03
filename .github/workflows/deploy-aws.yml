@@ -1,0 +1,54 @@
+# Deploy AHEAD Onboarding to AWS (ECS Fargate + ECR).
+# Uses the same GitHub Actions secrets pattern as policy-agent-ref:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+name: Deploy onboarding to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "bot/**"
+      - "src/**"
+      - "Dockerfile.frontend"
+      - "aws/**"
+      - ".github/workflows/deploy-aws.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  CI: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check AWS secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "::error::Add repository secrets (same names as policy-agent-ref):"
+            echo "  AWS_ACCESS_KEY_ID"
+            echo "  AWS_SECRET_ACCESS_KEY"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Deploy (build, push ECR, register task, update ECS)
+        run: |
+          chmod +x aws/deploy.sh
+          bash aws/deploy.sh

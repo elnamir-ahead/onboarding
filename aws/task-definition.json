@@ -1,0 +1,127 @@
+{
+  "family": "ahead-onboarding",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1536",
+  "executionRoleArn": "arn:aws:iam::740315635748:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::740315635748:role/ahead-onboarding-task-role",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "740315635748.dkr.ecr.us-east-1.amazonaws.com/ahead-onboarding-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3001,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV",           "value": "production" },
+        { "name": "PORT",               "value": "3001" },
+        { "name": "AWS_REGION",         "value": "us-east-1" },
+        { "name": "OPENAI_SECRET_ARN",  "value": "arn:aws:secretsmanager:us-east-1:740315635748:secret:openai_api_key-N4gRLQ" },
+        { "name": "CORS_ORIGIN",        "value": "*" }
+      ],
+      "secrets": [
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-jwt-secret"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/ahead-onboarding",
+          "awslogs-region":        "us-east-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:3001/api/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    },
+    {
+      "name": "bot",
+      "image": "740315635748.dkr.ecr.us-east-1.amazonaws.com/ahead-onboarding-bot:latest",
+      "essential": false,
+      "portMappings": [
+        {
+          "containerPort": 3978,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV",      "value": "production" },
+        { "name": "PORT",          "value": "3978" },
+        { "name": "AWS_REGION",    "value": "us-east-1" },
+        { "name": "BACKEND_URL",   "value": "http://localhost:3001" }
+      ],
+      "secrets": [
+        {
+          "name": "MICROSOFT_APP_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-id"
+        },
+        {
+          "name": "MICROSOFT_APP_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-password"
+        },
+        {
+          "name": "BOT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-bot-secret"
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "backend",
+          "condition": "HEALTHY"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/ahead-onboarding",
+          "awslogs-region":        "us-east-1",
+          "awslogs-stream-prefix": "bot"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:3978/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    },
+    {
+      "name": "frontend",
+      "image": "740315635748.dkr.ecr.us-east-1.amazonaws.com/ahead-onboarding-frontend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "backend",
+          "condition": "HEALTHY"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/ahead-onboarding",
+          "awslogs-region":        "us-east-1",
+          "awslogs-stream-prefix": "frontend"
+        }
+      }
+    }
+  ]
+}

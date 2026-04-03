@@ -1,0 +1,65 @@
+# Local development — hot-reload for both frontend (Vite) and backend (ts-node-dev)
+# Run: docker-compose up
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./server/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+    volumes:
+      # Mount source for hot reload (ts-node-dev handles recompile)
+      - ./server/src:/app/src:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    ports:
+      - "3978:3978"
+    env_file:
+      - ./bot/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3978
+      BACKEND_URL: http://backend:3001
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3978/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app:ro
+      - /app/node_modules
+      - /app/server
+      - /app/bot
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: ""      # empty = relative /api (proxied by Vite to backend:3001)
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
