@@ -142,10 +142,14 @@ if [[ "$MISSING" == "MISSING" ]]; then
   else
     echo ""
     echo "::error::ECS service '$SERVICE' does not exist yet. Choose one:"
-    echo "  A) One-time locally: bash aws/create-service.sh 'subnet-xxx,subnet-yyy' 'sg-zzz'"
-    echo "  B) GitHub Actions: add repo secrets ECS_SUBNET_IDS and ECS_SECURITY_GROUP_ID (comma-separated subnets, no spaces)"
-    echo "     Optional: ECS_TARGET_GROUP_ARN for ALB → frontend:80"
-    echo "  C) bash aws/setup.sh then create-service as in (A)"
+    echo "  A) GitHub: add secrets ECS_SUBNET_IDS + ECS_SECURITY_GROUP_ID (see .github/DEPLOY_SETUP.md)"
+    echo "  B) Local:  bash aws/suggest-create-service.sh   # if you have a default VPC"
+    echo "            bash aws/create-service.sh 'subnet-a,subnet-b' 'sg-xxx'"
+    echo "  C)        bash aws/setup.sh   # IAM/logs/secrets, then (B)"
+    if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ -z "${ECS_SUBNET_IDS:-}" ]]; then
+      echo ""
+      echo "  (CI: ECS_SUBNET_IDS is empty — add repository secrets or create the service once locally.)"
+    fi
     echo "  Docs: .github/DEPLOY_SETUP.md"
     exit 1
   fi
