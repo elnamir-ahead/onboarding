@@ -12,7 +12,7 @@
 # ============================================================
 set -euo pipefail
 
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text | tr -d '\r\n')
 REGION="us-east-1"
 APP="ahead-onboarding"
 CLUSTER="${APP}-cluster"

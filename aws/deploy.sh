@@ -7,7 +7,8 @@
 set -euo pipefail
 
 # Same pattern as policy-agent-ref: deploy with whatever account the AWS CLI is using
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+# Trim whitespace/newlines — a trailing \\n in ACCOUNT_ID breaks JSON for register-task-definition
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text | tr -d '\r\n')
 REGION="us-east-1"
 APP="ahead-onboarding"
 CLUSTER="${APP}-cluster"
@@ -15,6 +16,7 @@ SERVICE="${APP}-service"
 ECR="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
 TAG="${1:-$(git rev-parse --short HEAD 2>/dev/null || echo latest)}"
+TAG=$(printf '%s' "$TAG" | tr -d '\r\n')
 
 echo "=========================================="
 echo " AHEAD Onboarding — Deploy"
@@ -85,17 +87,23 @@ echo "  ✓ Pushed to ECR"
 echo ""
 echo "[5/6] Registering ECS task definition..."
 
-# Match images + IAM/Secrets ARNs to the current AWS account; pin image tag to $TAG
-TASK_DEF=$(cat "${ROOT}/aws/task-definition.json" \
-  | sed "s|740315635748|${ACCOUNT_ID}|g" \
-  | sed "s|:latest|:${TAG}|g")
+# Match IAM/Secrets ARNs + image registry account to $ACCOUNT_ID.
+# Only replace :latest on "image" lines — a global :latest replace can corrupt JSON (e.g. ARNs/strings).
+TASK_DEF=$(
+  sed "s|740315635748|${ACCOUNT_ID}|g" "${ROOT}/aws/task-definition.json" \
+    | sed "/\"image\":/s|:latest|:${TAG}|g"
+)
 
-TASK_ARN=$(echo "$TASK_DEF" \
-  | aws ecs register-task-definition \
-      --region "$REGION" \
-      --cli-input-json /dev/stdin \
-      --query 'taskDefinition.taskDefinitionArn' \
-      --output text)
+TASK_DEF_FILE=$(mktemp)
+trap 'rm -f "$TASK_DEF_FILE"' EXIT
+printf '%s' "$TASK_DEF" >"$TASK_DEF_FILE"
+TASK_ARN=$(aws ecs register-task-definition \
+  --region "$REGION" \
+  --cli-input-json "file://${TASK_DEF_FILE}" \
+  --query 'taskDefinition.taskDefinitionArn' \
+  --output text)
+trap - EXIT
+rm -f "$TASK_DEF_FILE"
 
 echo "  ✓ Task definition: $TASK_ARN"
 
