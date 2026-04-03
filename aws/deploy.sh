@@ -21,16 +21,32 @@ echo " AHEAD Onboarding — Deploy"
 echo " Tag: $TAG | Account: $ACCOUNT_ID"
 echo "=========================================="
 
+# ── 0. ECR repositories (create if missing — same names as aws/setup.sh) ──
+echo ""
+echo "[1/6] Ensuring ECR repositories exist..."
+for repo in "${APP}-frontend" "${APP}-backend" "${APP}-bot"; do
+  if aws ecr describe-repositories --repository-names "$repo" --region "$REGION" &>/dev/null; then
+    echo "  ✓ $repo"
+  else
+    echo "  Creating $repo..."
+    aws ecr create-repository \
+      --repository-name "$repo" \
+      --region "$REGION" \
+      --image-scanning-configuration scanOnPush=true \
+      --output text
+  fi
+done
+
 # ── 1. ECR login ─────────────────────────────────────────────
 echo ""
-echo "[1/5] Logging in to ECR..."
+echo "[2/6] Logging in to ECR..."
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$ECR"
 
 # ── 2. Build images ──────────────────────────────────────────
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo ""
-echo "[2/5] Building Docker images..."
+echo "[3/6] Building Docker images..."
 
 docker build \
   -t "${ECR}/${APP}-backend:${TAG}" \
@@ -54,7 +70,7 @@ echo "  ✓ Images built"
 
 # ── 3. Push images ───────────────────────────────────────────
 echo ""
-echo "[3/5] Pushing to ECR..."
+echo "[4/6] Pushing to ECR..."
 
 docker push "${ECR}/${APP}-backend:${TAG}"
 docker push "${ECR}/${APP}-backend:latest"
@@ -67,7 +83,7 @@ echo "  ✓ Pushed to ECR"
 
 # ── 4. Register task definition ──────────────────────────────
 echo ""
-echo "[4/5] Registering ECS task definition..."
+echo "[5/6] Registering ECS task definition..."
 
 # Match images + IAM/Secrets ARNs to the current AWS account; pin image tag to $TAG
 TASK_DEF=$(cat "${ROOT}/aws/task-definition.json" \
@@ -85,7 +101,7 @@ echo "  ✓ Task definition: $TASK_ARN"
 
 # ── 5. Update ECS service ────────────────────────────────────
 echo ""
-echo "[5/5] Updating ECS service..."
+echo "[6/6] Updating ECS service..."
 
 aws ecs update-service \
   --cluster "$CLUSTER" \

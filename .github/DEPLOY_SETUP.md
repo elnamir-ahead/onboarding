@@ -17,7 +17,7 @@ Region is fixed to **`us-east-1`** in the workflow (same default as policy-agent
 
 The policy-agent user has Lambda / S3 / CloudFront / DynamoDB / Bedrock. For **onboarding ECS deploy**, the same user also needs (or use a dedicated user with this policy attached):
 
-- **ECR**: `GetAuthorizationToken`, and on repos `ahead-onboarding-*`: `BatchCheckLayerAvailability`, `GetDownloadUrlForLayer`, `BatchGetImage`, `PutImage`, `InitiateLayerUpload`, `UploadLayerPart`, `CompleteLayerUpload`
+- **ECR**: `CreateRepository` (deploy script creates `ahead-onboarding-backend`, `ahead-onboarding-frontend`, `ahead-onboarding-bot` if missing), `GetAuthorizationToken`, and on those repos: push/pull image APIs (`PutImage`, `BatchCheckLayerAvailability`, etc.)
 - **ECS**: `RegisterTaskDefinition`, `UpdateService`, `DescribeServices`, `DescribeTaskDefinition`, `DescribeClusters`
 - **IAM**: `PassRole` on `ecsTaskExecutionRole` and `ahead-onboarding-task-role` (scoped ARNs recommended)
 - **Secrets Manager**: `GetSecretValue` for secrets referenced in the task definition (execution role usually covers pull; task role for app)
