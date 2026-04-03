@@ -29,12 +29,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Secrets must be defined on THIS repo (or org secrets with access to this repo).
+      # Repo: Settings → Secrets and variables → Actions → New repository secret
       - name: Check AWS secrets
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
-            echo "::error::Add repository secrets (same names as policy-agent-ref):"
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::Missing AWS credentials for this repository."
+            echo "Add these Action secrets (same names as policy-agent-ref):"
             echo "  AWS_ACCESS_KEY_ID"
             echo "  AWS_SECRET_ACCESS_KEY"
+            echo "https://github.com/elnamir-ahead/onboarding/settings/secrets/actions"
             exit 1
           fi
 
