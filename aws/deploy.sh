@@ -136,20 +136,47 @@ echo "[7/7] Updating ECS service..."
 MISSING=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --region "$REGION" \
   --query 'failures[0].reason' --output text 2>/dev/null || echo "")
 if [[ "$MISSING" == "MISSING" ]]; then
-  if [[ -n "${ECS_SUBNET_IDS:-}" ]] && [[ -n "${ECS_SECURITY_GROUP_ID:-}" ]]; then
-    echo "  Service missing — creating via ECS_SUBNET_IDS + ECS_SECURITY_GROUP_ID..."
-    bash "${ROOT}/aws/create-service.sh" "$ECS_SUBNET_IDS" "$ECS_SECURITY_GROUP_ID" "${ECS_TARGET_GROUP_ARN:-}"
+  SUBNETS_USE="${ECS_SUBNET_IDS:-}"
+  SG_USE="${ECS_SECURITY_GROUP_ID:-}"
+
+  # GitHub Actions: if no secrets, try default VPC (many dev accounts) — like Terraform owning networking for policy-agent
+  if [[ -z "$SUBNETS_USE" || -z "$SG_USE" ]]; then
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]] || [[ "${ECS_AUTO_DEFAULT_VPC:-}" == "1" ]]; then
+      echo "  Service missing — auto-selecting default VPC (CI or ECS_AUTO_DEFAULT_VPC=1)..."
+      DEF_VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true \
+        --query 'Vpcs[0].VpcId' --output text --region "$REGION" 2>/dev/null || true)
+      if [[ -n "$DEF_VPC" && "$DEF_VPC" != "None" ]]; then
+        RAW_SUB=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$DEF_VPC" \
+          --query 'Subnets[:2].SubnetId' --output text --region "$REGION")
+        SUBNETS_USE=$(echo "$RAW_SUB" | tr '\t' ',' | tr ' ' ',')
+        SG_USE=$(aws ec2 describe-security-groups \
+          --filters "Name=vpc-id,Values=$DEF_VPC" "Name=group-name,Values=default" \
+          --query 'SecurityGroups[0].GroupId' --output text --region "$REGION")
+      fi
+      NS=$(echo "$SUBNETS_USE" | awk -F, '{print NF}')
+      if [[ "${NS:-0}" -lt 2 ]] || [[ -z "$SG_USE" || "$SG_USE" == "None" ]]; then
+        echo ""
+        echo "::error::No usable default VPC (or fewer than 2 subnets). This account needs explicit networking."
+        echo "  Add GitHub secrets: ECS_SUBNET_IDS + ECS_SECURITY_GROUP_ID"
+        echo "  Or run locally: bash aws/create-service.sh 'subnet-a,subnet-b' 'sg-xxx'"
+        echo "  Docs: .github/DEPLOY_SETUP.md"
+        exit 1
+      fi
+      echo "  Using default VPC $DEF_VPC — subnets=$SUBNETS_USE sg=$SG_USE"
+    fi
+  fi
+
+  if [[ -n "$SUBNETS_USE" && -n "$SG_USE" ]]; then
+    echo "  Creating ECS service..."
+    bash "${ROOT}/aws/create-service.sh" "$SUBNETS_USE" "$SG_USE" "${ECS_TARGET_GROUP_ARN:-}"
   else
     echo ""
     echo "::error::ECS service '$SERVICE' does not exist yet. Choose one:"
     echo "  A) GitHub: add secrets ECS_SUBNET_IDS + ECS_SECURITY_GROUP_ID (see .github/DEPLOY_SETUP.md)"
-    echo "  B) Local:  bash aws/suggest-create-service.sh   # if you have a default VPC"
+    echo "  B) Local:  ECS_AUTO_DEFAULT_VPC=1 bash aws/deploy.sh   # if you have a default VPC"
+    echo "            bash aws/suggest-create-service.sh"
     echo "            bash aws/create-service.sh 'subnet-a,subnet-b' 'sg-xxx'"
-    echo "  C)        bash aws/setup.sh   # IAM/logs/secrets, then (B)"
-    if [[ -n "${GITHUB_ACTIONS:-}" ]] && [[ -z "${ECS_SUBNET_IDS:-}" ]]; then
-      echo ""
-      echo "  (CI: ECS_SUBNET_IDS is empty — add repository secrets or create the service once locally.)"
-    fi
+    echo "  C)        bash aws/setup.sh   # then (B)"
     echo "  Docs: .github/DEPLOY_SETUP.md"
     exit 1
   fi

@@ -13,9 +13,14 @@ In the **onboarding** GitHub repo: **Settings → Secrets and variables → Acti
 
 Region is fixed to **`us-east-1`** in the workflow (same default as policy-agent-ref).
 
-### Optional: first-time ECS service from GitHub Actions
+### First-time ECS service in GitHub Actions
 
-If the ECS service **`ahead-onboarding-service`** does not exist yet, the deploy script exits unless you either run **`create-service.sh` locally** once, **or** add these secrets so CI can create the service automatically:
+On each push, **`deploy.sh`** runs with **`GITHUB_ACTIONS=true`**. If the ECS service does not exist yet:
+
+1. **Automatic (no secrets):** it tries the account’s **default VPC** — first **two subnets** + **`default` security group**. This matches many **dev** accounts and mirrors “Terraform picks networking” for policy-agent.
+2. If there is **no default VPC** (common in **prod**), add secrets below.
+
+**Optional explicit secrets** (override auto or use when default VPC is missing):
 
 | Secret | Example value | Notes |
 |--------|----------------|--------|
