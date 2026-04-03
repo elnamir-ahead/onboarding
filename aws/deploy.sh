@@ -25,7 +25,7 @@ echo "=========================================="
 
 # ── 0. ECR repositories (create if missing — same names as aws/setup.sh) ──
 echo ""
-echo "[1/6] Ensuring ECR repositories exist..."
+echo "[1/7] Ensuring ECR repositories exist..."
 for repo in "${APP}-frontend" "${APP}-backend" "${APP}-bot"; do
   if aws ecr describe-repositories --repository-names "$repo" --region "$REGION" &>/dev/null; then
     echo "  ✓ $repo"
@@ -41,14 +41,14 @@ done
 
 # ── 1. ECR login ─────────────────────────────────────────────
 echo ""
-echo "[2/6] Logging in to ECR..."
+echo "[2/7] Logging in to ECR..."
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$ECR"
 
 # ── 2. Build images ──────────────────────────────────────────
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo ""
-echo "[3/6] Building Docker images..."
+echo "[3/7] Building Docker images..."
 
 docker build \
   -t "${ECR}/${APP}-backend:${TAG}" \
@@ -72,7 +72,7 @@ echo "  ✓ Images built"
 
 # ── 3. Push images ───────────────────────────────────────────
 echo ""
-echo "[4/6] Pushing to ECR..."
+echo "[4/7] Pushing to ECR..."
 
 docker push "${ECR}/${APP}-backend:${TAG}"
 docker push "${ECR}/${APP}-backend:latest"
@@ -85,7 +85,7 @@ echo "  ✓ Pushed to ECR"
 
 # ── 4. Register task definition ──────────────────────────────
 echo ""
-echo "[5/6] Registering ECS task definition..."
+echo "[5/7] Registering ECS task definition..."
 
 # Match IAM/Secrets ARNs + image registry account to $ACCOUNT_ID.
 # Only replace :latest on "image" lines — a global :latest replace can corrupt JSON (e.g. ARNs/strings).
@@ -107,9 +107,42 @@ rm -f "$TASK_DEF_FILE"
 
 echo "  ✓ Task definition: $TASK_ARN"
 
-# ── 5. Update ECS service ────────────────────────────────────
+# ── 5b. ECS cluster + logs (same as aws/setup.sh — idempotent) ─────────────
 echo ""
-echo "[6/6] Updating ECS service..."
+echo "[6/7] Ensuring ECS cluster and log group exist..."
+
+CLUSTER_STATUS=$(aws ecs describe-clusters --clusters "$CLUSTER" --region "$REGION" \
+  --query 'clusters[0].status' --output text 2>/dev/null || echo "")
+if [[ "$CLUSTER_STATUS" != "ACTIVE" ]]; then
+  echo "  Creating cluster $CLUSTER..."
+  aws ecs create-cluster \
+    --cluster-name "$CLUSTER" \
+    --region "$REGION" \
+    --capacity-providers FARGATE FARGATE_SPOT \
+    --output text
+fi
+echo "  ✓ Cluster: $CLUSTER"
+
+aws logs create-log-group --log-group-name "/ecs/${APP}" --region "$REGION" 2>/dev/null || true
+aws logs put-retention-policy \
+  --log-group-name "/ecs/${APP}" \
+  --retention-in-days 30 \
+  --region "$REGION" 2>/dev/null || true
+
+# ── 6. Update ECS service (service must exist — run create-service.sh once) ─
+echo ""
+echo "[7/7] Updating ECS service..."
+
+MISSING=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --region "$REGION" \
+  --query 'failures[0].reason' --output text 2>/dev/null || echo "")
+if [[ "$MISSING" == "MISSING" ]]; then
+  echo ""
+  echo "::error::ECS service '$SERVICE' does not exist yet. Create it once with subnets + security group:"
+  echo "    bash aws/create-service.sh '<subnet-id-1>,<subnet-id-2>' '<security-group-id>'"
+  echo "  Or run full one-time setup: bash aws/setup.sh"
+  echo "  Docs: .github/DEPLOY_SETUP.md"
+  exit 1
+fi
 
 aws ecs update-service \
   --cluster "$CLUSTER" \

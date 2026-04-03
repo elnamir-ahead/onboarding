@@ -31,6 +31,9 @@ bash aws/setup.sh
 bash aws/create-service.sh <subnet-ids-comma-separated> <security-group-id>
 ```
 
+- **`deploy.sh` creates** the **ECR** repos and **ECS cluster** if they are missing.
+- It **does not** create the **ECS service** (needs your **VPC subnets** + **security group**). Until `ahead-onboarding-service` exists, step `[7/7]` fails with instructions — run **`create-service.sh`** once as above.
+
 Then set **Secrets Manager** values for the bot (`ahead-onboarding-microsoft-app-id`, `ahead-onboarding-microsoft-app-password`, etc.) as described in `aws/setup.sh`.
 
 ## Manual deploy (local)
