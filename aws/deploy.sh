@@ -136,12 +136,19 @@ echo "[7/7] Updating ECS service..."
 MISSING=$(aws ecs describe-services --cluster "$CLUSTER" --services "$SERVICE" --region "$REGION" \
   --query 'failures[0].reason' --output text 2>/dev/null || echo "")
 if [[ "$MISSING" == "MISSING" ]]; then
-  echo ""
-  echo "::error::ECS service '$SERVICE' does not exist yet. Create it once with subnets + security group:"
-  echo "    bash aws/create-service.sh '<subnet-id-1>,<subnet-id-2>' '<security-group-id>'"
-  echo "  Or run full one-time setup: bash aws/setup.sh"
-  echo "  Docs: .github/DEPLOY_SETUP.md"
-  exit 1
+  if [[ -n "${ECS_SUBNET_IDS:-}" ]] && [[ -n "${ECS_SECURITY_GROUP_ID:-}" ]]; then
+    echo "  Service missing — creating via ECS_SUBNET_IDS + ECS_SECURITY_GROUP_ID..."
+    bash "${ROOT}/aws/create-service.sh" "$ECS_SUBNET_IDS" "$ECS_SECURITY_GROUP_ID" "${ECS_TARGET_GROUP_ARN:-}"
+  else
+    echo ""
+    echo "::error::ECS service '$SERVICE' does not exist yet. Choose one:"
+    echo "  A) One-time locally: bash aws/create-service.sh 'subnet-xxx,subnet-yyy' 'sg-zzz'"
+    echo "  B) GitHub Actions: add repo secrets ECS_SUBNET_IDS and ECS_SECURITY_GROUP_ID (comma-separated subnets, no spaces)"
+    echo "     Optional: ECS_TARGET_GROUP_ARN for ALB → frontend:80"
+    echo "  C) bash aws/setup.sh then create-service as in (A)"
+    echo "  Docs: .github/DEPLOY_SETUP.md"
+    exit 1
+  fi
 fi
 
 aws ecs update-service \

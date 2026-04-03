@@ -13,6 +13,20 @@ In the **onboarding** GitHub repo: **Settings → Secrets and variables → Acti
 
 Region is fixed to **`us-east-1`** in the workflow (same default as policy-agent-ref).
 
+### Optional: first-time ECS service from GitHub Actions
+
+If the ECS service **`ahead-onboarding-service`** does not exist yet, the deploy script exits unless you either run **`create-service.sh` locally** once, **or** add these secrets so CI can create the service automatically:
+
+| Secret | Example value | Notes |
+|--------|----------------|--------|
+| `ECS_SUBNET_IDS` | `subnet-0abc,subnet-0def` | At least one subnet; **two** in different AZs is better. **No spaces.** Same VPC as the security group. |
+| `ECS_SECURITY_GROUP_ID` | `sg-0123456789abcdef0` | Must allow **inbound** to **80** (frontend), **3978** (bot webhook), **3001** (API) from your ALB or the internet, as you intend. |
+| `ECS_TARGET_GROUP_ARN` | *(optional)* | ALB target group ARN — attaches **frontend** container port **80** to the load balancer. |
+
+Find subnets/SGs: `aws ec2 describe-subnets --region us-east-1` and `describe-security-groups`.
+
+After the service exists once, you can remove `ECS_SUBNET_IDS` / `ECS_SECURITY_GROUP_ID` from secrets if you prefer (deploy will only **update** the service).
+
 ## IAM permissions (on top of policy-agent)
 
 The policy-agent user has Lambda / S3 / CloudFront / DynamoDB / Bedrock. For **onboarding ECS deploy**, the same user also needs (or use a dedicated user with this policy attached):

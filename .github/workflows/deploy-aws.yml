@@ -55,7 +55,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Optional: auto-create ECS service on first deploy (comma-separated subnet IDs, no spaces).
       - name: Deploy (build, push ECR, register task, update ECS)
+        env:
+          ECS_SUBNET_IDS: ${{ secrets.ECS_SUBNET_IDS }}
+          ECS_SECURITY_GROUP_ID: ${{ secrets.ECS_SECURITY_GROUP_ID }}
+          ECS_TARGET_GROUP_ARN: ${{ secrets.ECS_TARGET_GROUP_ARN }}
         run: |
-          chmod +x aws/deploy.sh
+          chmod +x aws/deploy.sh aws/create-service.sh
           bash aws/deploy.sh
