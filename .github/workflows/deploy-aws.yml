@@ -17,6 +17,8 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  ECS_CLUSTER: ahead-onboarding-cluster
+  ECS_SERVICE: ahead-onboarding-service
   CI: true
 
 jobs:
@@ -24,33 +26,52 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Secrets must be defined on THIS repo (or org secrets with access to this repo).
-      # Repo: Settings → Secrets and variables → Actions → New repository secret
-      - name: Check AWS secrets
+      # Prefer OIDC role auth when AWS_ROLE_TO_ASSUME is set.
+      # Otherwise fall back to static AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+      - name: Check AWS auth configuration
         env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "::error::Missing AWS credentials for this repository."
-            echo "Add these Action secrets (same names as policy-agent-ref):"
-            echo "  AWS_ACCESS_KEY_ID"
-            echo "  AWS_SECRET_ACCESS_KEY"
-            echo "https://github.com/elnamir-ahead/onboarding/settings/secrets/actions"
-            exit 1
+          if [ -n "$AWS_ROLE_TO_ASSUME" ]; then
+            echo "Using OIDC role auth via AWS_ROLE_TO_ASSUME."
+            exit 0
           fi
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "Using static AWS key auth."
+            exit 0
+          fi
+          echo "::error::Missing AWS auth configuration for this repository."
+          echo "Set ONE of:"
+          echo "  - AWS_ROLE_TO_ASSUME (recommended, OIDC)"
+          echo "  - AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY"
+          echo "Repo settings: https://github.com/elnamir-ahead/onboarding/settings/secrets/actions"
+          exit 1
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC role)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (static keys)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -64,3 +85,44 @@ jobs:
         run: |
           chmod +x aws/deploy.sh aws/create-service.sh aws/ensure-ecs-execution-role.sh
           bash aws/deploy.sh
+
+      - name: Post-deploy ECS stability gate
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"
+
+      - name: Post-deploy ECS health check
+        run: |
+          STATUS=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].status' --output text)
+          RUNNING=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].runningCount' --output text)
+          DESIRED=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].desiredCount' --output text)
+
+          echo "Service status=$STATUS running=$RUNNING desired=$DESIRED"
+          if [ "$STATUS" != "ACTIVE" ]; then
+            echo "::error::ECS service is not ACTIVE."
+            exit 1
+          fi
+          if [ "$RUNNING" -lt "$DESIRED" ] || [ "$RUNNING" -lt 1 ]; then
+            echo "::error::ECS service is not healthy: running tasks less than desired."
+            aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE" \
+              --region "$AWS_REGION" \
+              --query 'services[0].events[0:10].[createdAt,message]' \
+              --output table || true
+            exit 1
+          fi
