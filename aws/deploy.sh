@@ -51,18 +51,21 @@ echo ""
 echo "[3/7] Building Docker images..."
 
 docker build \
+  --platform linux/amd64 \
   -t "${ECR}/${APP}-backend:${TAG}" \
   -t "${ECR}/${APP}-backend:latest" \
   -f "${ROOT}/server/Dockerfile" \
   "${ROOT}/server"
 
 docker build \
+  --platform linux/amd64 \
   -t "${ECR}/${APP}-frontend:${TAG}" \
   -t "${ECR}/${APP}-frontend:latest" \
   -f "${ROOT}/Dockerfile.frontend" \
   "${ROOT}"
 
 docker build \
+  --platform linux/amd64 \
   -t "${ECR}/${APP}-bot:${TAG}" \
   -t "${ECR}/${APP}-bot:latest" \
   -f "${ROOT}/bot/Dockerfile" \
