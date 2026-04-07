@@ -2,6 +2,7 @@ import {
   CreateTableCommand,
   DescribeTableCommand,
   DynamoDBClient,
+  ResourceNotFoundException,
   waitUntilTableExists,
 } from '@aws-sdk/client-dynamodb';
 import {
@@ -17,14 +18,35 @@ import { dynamo, TABLES } from '../aws';
 
 // ── Table bootstrap ──────────────────────────────────────────────────────────
 const rawClient = new DynamoDBClient({ region: process.env.AWS_REGION ?? 'us-east-1' });
+const BOOTSTRAP_DDB_TABLES = (process.env.BOOTSTRAP_DDB_TABLES ?? 'false').toLowerCase() === 'true';
 
 async function tableExists(name: string): Promise<boolean> {
   try {
     await rawClient.send(new DescribeTableCommand({ TableName: name }));
     return true;
-  } catch {
+  } catch (err) {
+    if (err instanceof ResourceNotFoundException) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+async function ensureOrCreateTable(
+  params: ConstructorParameters<typeof CreateTableCommand>[0]
+): Promise<boolean> {
+  const name = params.TableName ?? '(unknown)';
+  if (await tableExists(name)) {
     return false;
   }
+  if (!BOOTSTRAP_DDB_TABLES) {
+    throw new Error(
+      `[DB] Required table '${name}' does not exist. Provision DynamoDB via IaC before deploy. ` +
+      `For one-time setup only, set BOOTSTRAP_DDB_TABLES=true with CreateTable IAM permissions.`
+    );
+  }
+  await createTable(params);
+  return true;
 }
 
 async function createTable(params: ConstructorParameters<typeof CreateTableCommand>[0]) {
@@ -43,24 +65,24 @@ async function createTable(params: ConstructorParameters<typeof CreateTableComma
 }
 
 export async function bootstrapTables() {
+  console.log(`[DB] BOOTSTRAP_DDB_TABLES=${BOOTSTRAP_DDB_TABLES ? 'true' : 'false'}`);
+
   // Users table — PK: email
-  if (!(await tableExists(TABLES.USERS))) {
-    await createTable({
-      TableName: TABLES.USERS,
-      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
-      AttributeDefinitions: [{ AttributeName: 'email', AttributeType: 'S' }],
-      BillingMode: 'PAY_PER_REQUEST',
-    });
-  }
+  await ensureOrCreateTable({
+    TableName: TABLES.USERS,
+    KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'email', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  });
 
   // Tasks table — PK: id
-  if (!(await tableExists(TABLES.TASKS))) {
-    await createTable({
-      TableName: TABLES.TASKS,
-      KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
-      AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
-      BillingMode: 'PAY_PER_REQUEST',
-    });
+  const createdTasksTable = await ensureOrCreateTable({
+    TableName: TABLES.TASKS,
+    KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  });
+  if (createdTasksTable) {
     await seedTasks();
   } else {
     // Table exists but may be empty if a previous seed failed
@@ -72,30 +94,26 @@ export async function bootstrapTables() {
   }
 
   // Progress table — PK: userId, SK: taskId
-  if (!(await tableExists(TABLES.PROGRESS))) {
-    await createTable({
-      TableName: TABLES.PROGRESS,
-      KeySchema: [
-        { AttributeName: 'userId', KeyType: 'HASH' },
-        { AttributeName: 'taskId', KeyType: 'RANGE' },
-      ],
-      AttributeDefinitions: [
-        { AttributeName: 'userId', AttributeType: 'S' },
-        { AttributeName: 'taskId', AttributeType: 'S' },
-      ],
-      BillingMode: 'PAY_PER_REQUEST',
-    });
-  }
+  await ensureOrCreateTable({
+    TableName: TABLES.PROGRESS,
+    KeySchema: [
+      { AttributeName: 'userId', KeyType: 'HASH' },
+      { AttributeName: 'taskId', KeyType: 'RANGE' },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'taskId', AttributeType: 'S' },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  });
 
   // Bot sessions table — PK: teamsId
-  if (!(await tableExists(TABLES.BOT_SESSIONS))) {
-    await createTable({
-      TableName: TABLES.BOT_SESSIONS,
-      KeySchema: [{ AttributeName: 'teamsId', KeyType: 'HASH' }],
-      AttributeDefinitions: [{ AttributeName: 'teamsId', AttributeType: 'S' }],
-      BillingMode: 'PAY_PER_REQUEST',
-    });
-  }
+  await ensureOrCreateTable({
+    TableName: TABLES.BOT_SESSIONS,
+    KeySchema: [{ AttributeName: 'teamsId', KeyType: 'HASH' }],
+    AttributeDefinitions: [{ AttributeName: 'teamsId', AttributeType: 'S' }],
+    BillingMode: 'PAY_PER_REQUEST',
+  });
 
   console.log('[DB] All tables ready.');
 }
