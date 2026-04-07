@@ -56,6 +56,11 @@ aws iam put-role-policy \
 
 echo "  ✓ IAM role: $ROLE_NAME"
 
+# ── 2b. ECS task execution role (ECR + logs + secrets for containers) ─────
+echo ""
+echo "[2b/7] ECS task execution role..."
+bash "$(dirname "$0")/ensure-ecs-execution-role.sh"
+
 # ── 3. ECS Cluster ───────────────────────────────────────────
 echo ""
 echo "[3/6] Creating ECS Fargate cluster..."

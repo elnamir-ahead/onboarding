@@ -4,7 +4,7 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "2048",
-  "executionRoleArn": "arn:aws:iam::740315635748:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::740315635748:role/ahead-onboarding-execution-role",
   "taskRoleArn": "arn:aws:iam::740315635748:role/ahead-onboarding-task-role",
   "containerDefinitions": [
     {

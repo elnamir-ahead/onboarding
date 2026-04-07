@@ -62,5 +62,5 @@ jobs:
           ECS_SECURITY_GROUP_ID: ${{ secrets.ECS_SECURITY_GROUP_ID }}
           ECS_TARGET_GROUP_ARN: ${{ secrets.ECS_TARGET_GROUP_ARN }}
         run: |
-          chmod +x aws/deploy.sh aws/create-service.sh
+          chmod +x aws/deploy.sh aws/create-service.sh aws/ensure-ecs-execution-role.sh
           bash aws/deploy.sh

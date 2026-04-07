@@ -38,7 +38,7 @@ The policy-agent user has Lambda / S3 / CloudFront / DynamoDB / Bedrock. For **o
 
 - **ECR**: `CreateRepository` (deploy script creates `ahead-onboarding-backend`, `ahead-onboarding-frontend`, `ahead-onboarding-bot` if missing), `GetAuthorizationToken`, and on those repos: push/pull image APIs (`PutImage`, `BatchCheckLayerAvailability`, etc.)
 - **ECS**: `RegisterTaskDefinition`, `UpdateService`, `DescribeServices`, `DescribeTaskDefinition`, `DescribeClusters`
-- **IAM**: `PassRole` on `ecsTaskExecutionRole` and `ahead-onboarding-task-role` (scoped ARNs recommended)
+- **IAM**: `PassRole` on **`ahead-onboarding-execution-role`** and **`ahead-onboarding-task-role`** (and `iam:CreateRole` / `AttachRolePolicy` if CI runs `ensure-ecs-execution-role.sh`). The task definition uses **`ahead-onboarding-execution-role`**, not the generic `ecsTaskExecutionRole` (often missing in dev accounts).
 - **Secrets Manager**: `GetSecretValue` for secrets referenced in the task definition (execution role usually covers pull; task role for app)
 - **Logs**: `CreateLogStream`, `PutLogEvents` (often via task execution role — ensure it exists)
 

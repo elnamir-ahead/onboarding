@@ -83,6 +83,11 @@ docker push "${ECR}/${APP}-bot:latest"
 
 echo "  ✓ Pushed to ECR"
 
+# ── 3b. Execution role (ECS must assume this to pull images + read task secrets)
+echo ""
+echo "[4b/7] Ensuring ECS task execution role..."
+bash "${ROOT}/aws/ensure-ecs-execution-role.sh"
+
 # ── 4. Register task definition ──────────────────────────────
 echo ""
 echo "[5/7] Registering ECS task definition..."
