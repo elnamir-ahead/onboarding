@@ -89,10 +89,36 @@ jobs:
 
       - name: Post-deploy ECS stability gate
         run: |
+          set +e
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE" \
             --region "$AWS_REGION"
+          WAIT_RC=$?
+          set -e
+
+          if [ $WAIT_RC -ne 0 ]; then
+            echo "::warning::ECS waiter timed out. Retrying after short backoff..."
+            sleep 30
+            set +e
+            aws ecs wait services-stable \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE" \
+              --region "$AWS_REGION"
+            WAIT_RC=$?
+            set -e
+          fi
+
+          if [ $WAIT_RC -ne 0 ]; then
+            echo "::error::ECS did not reach stable state."
+            aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE" \
+              --region "$AWS_REGION" \
+              --query 'services[0].{running:runningCount,desired:desiredCount,status:status,deployments:deployments[*].{status:status,rollout:rolloutState,running:runningCount,desired:desiredCount},events:events[0:15].[createdAt,message]}' \
+              --output json || true
+            exit 1
+          fi
 
       - name: Post-deploy ECS health check
         run: |
