@@ -27,7 +27,7 @@
       "secrets": [
         {
           "name": "JWT_SECRET",
-          "valueFrom": "ahead-onboarding-jwt-secret"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-jwt-secret-BDr5bo"
         }
       ],
       "logConfiguration": {
@@ -65,15 +65,15 @@
       "secrets": [
         {
           "name": "MICROSOFT_APP_ID",
-          "valueFrom": "ahead-onboarding-microsoft-app-id"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-id-VaU1GT"
         },
         {
           "name": "MICROSOFT_APP_PASSWORD",
-          "valueFrom": "ahead-onboarding-microsoft-app-password"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-password-KLHFb8"
         },
         {
           "name": "BOT_SECRET",
-          "valueFrom": "ahead-onboarding-bot-secret"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-bot-secret-LlEeHf"
         }
       ],
       "dependsOn": [
