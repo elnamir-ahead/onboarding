@@ -21,13 +21,13 @@
         { "name": "NODE_ENV",           "value": "production" },
         { "name": "PORT",               "value": "3001" },
         { "name": "AWS_REGION",         "value": "us-east-1" },
-        { "name": "OPENAI_SECRET_ARN",  "value": "arn:aws:secretsmanager:us-east-1:740315635748:secret:openai_api_key-N4gRLQ" },
+        { "name": "OPENAI_SECRET_ARN",  "value": "openai_api_key" },
         { "name": "CORS_ORIGIN",        "value": "*" }
       ],
       "secrets": [
         {
           "name": "JWT_SECRET",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-jwt-secret"
+          "valueFrom": "ahead-onboarding-jwt-secret"
         }
       ],
       "logConfiguration": {
@@ -65,15 +65,15 @@
       "secrets": [
         {
           "name": "MICROSOFT_APP_ID",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-id"
+          "valueFrom": "ahead-onboarding-microsoft-app-id"
         },
         {
           "name": "MICROSOFT_APP_PASSWORD",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-microsoft-app-password"
+          "valueFrom": "ahead-onboarding-microsoft-app-password"
         },
         {
           "name": "BOT_SECRET",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:740315635748:secret:ahead-onboarding-bot-secret"
+          "valueFrom": "ahead-onboarding-bot-secret"
         }
       ],
       "dependsOn": [
