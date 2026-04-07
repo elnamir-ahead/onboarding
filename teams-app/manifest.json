@@ -1,0 +1,43 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "9f2b9f7f-7a6f-4d0d-89cd-4fcbf4b7b7b1",
+  "packageName": "com.ahead.archie.test",
+  "name": {
+    "short": "ARCHIE Test",
+    "full": "ARCHIE Test Onboarding Bot"
+  },
+  "developer": {
+    "name": "AHEAD",
+    "websiteUrl": "https://www.ahead.com",
+    "privacyUrl": "https://www.ahead.com/privacy-policy",
+    "termsOfUseUrl": "https://www.ahead.com/terms-and-conditions"
+  },
+  "description": {
+    "short": "Testing interconnection between ARCHIE and Teams",
+    "full": "ARCHIE Test bot for onboarding and conversational workflows in Microsoft Teams."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#1D4ED8",
+  "bots": [
+    {
+      "botId": "00000000-0000-0000-0000-000000000000",
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
+      "isNotificationOnly": false,
+      "supportsFiles": false
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": []
+}
